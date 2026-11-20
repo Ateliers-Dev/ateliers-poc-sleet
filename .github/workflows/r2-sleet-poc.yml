@@ -25,14 +25,14 @@ jobs:
       SLEET_FEED_SERVICEURL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
       SLEET_FEED_BASEURI: ${{ secrets.R2_PUBLIC_BASE_URI }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: 8.0.x
 
       - name: Install Sleet
-        run: dotnet tool install --global sleet --version "7.*"
+        run: dotnet tool install --global sleet --version 7.2.0
 
       - name: Pack sample package
         run: dotnet pack src/Ateliers.Poc.Sleet.Sample/Ateliers.Poc.Sleet.Sample.csproj --configuration Release --output artifacts/packages -p:PackageVersion="$PACKAGE_VERSION"
