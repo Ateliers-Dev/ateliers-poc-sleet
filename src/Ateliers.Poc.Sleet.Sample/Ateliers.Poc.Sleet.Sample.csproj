@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>Ateliers.Poc.Sleet.Sample</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Ateliers-Dev</Authors>
+    <Description>Minimal package for the Cloudflare R2 and Sleet proof of concept.</Description>
+  </PropertyGroup>
+</Project>

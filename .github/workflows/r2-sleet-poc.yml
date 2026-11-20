@@ -1,0 +1,70 @@
+name: R2 Sleet NuGet PoC
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r2-sleet-poc-feed
+  cancel-in-progress: false
+
+jobs:
+  publish-restore-delete:
+    runs-on: ubuntu-latest
+    env:
+      PACKAGE_VERSION: 0.1.${{ github.run_number }}
+      FEED_INDEX: ${{ secrets.R2_PUBLIC_BASE_URI }}index.json
+      SLEET_FEED_TYPE: s3
+      SLEET_FEED_PROVIDER: r2
+      SLEET_FEED_BUCKETNAME: ${{ secrets.R2_BUCKET_NAME }}
+      SLEET_FEED_SERVICEURL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      SLEET_FEED_BASEURI: ${{ secrets.R2_PUBLIC_BASE_URI }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install Sleet
+        run: dotnet tool install --global sleet --version "7.*"
+
+      - name: Pack sample package
+        run: dotnet pack src/Ateliers.Poc.Sleet.Sample/Ateliers.Poc.Sleet.Sample.csproj --configuration Release --output artifacts/packages -p:PackageVersion="$PACKAGE_VERSION"
+
+      - name: Publish package to R2
+        run: sleet push artifacts/packages --skip-existing --config none --verbosity minimal
+
+      - name: Restore consumer anonymously
+        env:
+          NUGET_PACKAGES: ${{ runner.temp }}/nuget-packages-before-delete
+          NUGET_HTTP_CACHE_PATH: ${{ runner.temp }}/nuget-http-before-delete
+        run: dotnet restore samples/Consumer/Consumer.csproj --source "$FEED_INDEX" --force --no-cache -p:SamplePackageVersion="$PACKAGE_VERSION"
+
+      - name: Delete package version from R2
+        run: sleet delete --id Ateliers.Poc.Sleet.Sample --version "$PACKAGE_VERSION" --config none --verbosity minimal
+
+      - name: Confirm deleted package is unavailable with fresh caches
+        env:
+          NUGET_PACKAGES: ${{ runner.temp }}/nuget-packages-after-delete
+          NUGET_HTTP_CACHE_PATH: ${{ runner.temp }}/nuget-http-after-delete
+        shell: bash
+        run: |
+          set +e
+          output=$(dotnet restore samples/Consumer/Consumer.csproj --source "$FEED_INDEX" --force --no-cache -p:SamplePackageVersion="$PACKAGE_VERSION" 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -eq 0 ]; then
+            echo "Restore unexpectedly succeeded after the package was deleted."
+            exit 1
+          fi
+          if ! grep -q 'NU1101' <<< "$output"; then
+            echo "Restore failed for a reason other than the expected missing package (NU1101)."
+            exit 1
+          fi
+          echo "Confirmed: the deleted package cannot be restored with fresh caches."
